@@ -13,41 +13,126 @@ public class LinearAlgebraEngine {
     private TiredExecutor executor;
 
     public LinearAlgebraEngine(int numThreads) {
-        // TODO: create executor with given thread count
+        executor = new TiredExecutor(numThreads);
     }
 
     public ComputationNode run(ComputationNode computationRoot) {
-        // TODO: resolve computation tree step by step until final matrix is produced
-        return null;
+        computationRoot.associativeNesting();
+        ComputationNode resolvable;
+        while ((resolvable = computationRoot.findResolvable()) != null) {
+            loadAndCompute(resolvable);
+        }
+        try{
+            if (executor != null) {
+                executor.shutdown();
+            }
+        }
+        catch(Exception e){
+            Thread.currentThread().interrupt();
+        }
+
+        return computationRoot;
     }
 
     public void loadAndCompute(ComputationNode node) {
-        // TODO: load operand matrices
-        // TODO: create compute tasks & submit tasks to executor
+        List<ComputationNode> children = node.getChildren();
+        this.leftMatrix = new SharedMatrix(children.get(0).getMatrix());
+
+        if (children.size() > 1) {
+            this.rightMatrix = new SharedMatrix(children.get(1).getMatrix());
+        }
+
+        List<Runnable> tasks = null;
+        switch (node.getNodeType()) {
+            case ADD:
+                tasks = createAddTasks();
+                break;
+            case MULTIPLY:
+                tasks = createMultiplyTasks();
+                break;
+            case NEGATE:
+                tasks = createNegateTasks();
+                break;
+            case TRANSPOSE:
+                tasks = createTransposeTasks();
+                break;
+            default:
+                break;
+        }
+
+        if(tasks!=null){
+            executor.submitAll(tasks);
+        }
+        node.resolve(leftMatrix.readRowMajor());
+
     }
 
     public List<Runnable> createAddTasks() {
-        // TODO: return tasks that perform row-wise addition
-        return null;
+        List<Runnable> tasks = new java.util.ArrayList<>();
+
+        int numVectors = leftMatrix.length(); 
+
+        for (int i = 0; i < numVectors; i++) {
+            final int index = i;
+            tasks.add(() -> {
+                SharedVector vLeft = leftMatrix.get(index);
+                SharedVector vRight = rightMatrix.get(index);
+                vLeft.add(vRight);
+            });
+        }
+        return tasks;
     }
 
     public List<Runnable> createMultiplyTasks() {
-        // TODO: return tasks that perform row × matrix multiplication
-        return null;
+        List<Runnable> tasks = new java.util.ArrayList<>();
+
+        int numVectors = leftMatrix.length(); 
+
+        for (int i = 0; i < numVectors; i++) {
+            final int index = i;
+            tasks.add(() -> {
+                SharedVector vLeft = leftMatrix.get(index);
+                vLeft.vecMatMul(rightMatrix);
+            });
+        }
+        return tasks;
     }
 
     public List<Runnable> createNegateTasks() {
-        // TODO: return tasks that negate rows
-        return null;
+        List<Runnable> tasks = new java.util.ArrayList<>();
+    
+        int numVectors = leftMatrix.length();
+
+        for (int i = 0; i < numVectors; i++) {
+            final int index = i; 
+            
+            tasks.add(() -> {
+                leftMatrix.get(index).negate();
+            });
+        }
+    
+        return tasks;
     }
 
     public List<Runnable> createTransposeTasks() {
-        // TODO: return tasks that transpose rows
-        return null;
+        List<Runnable> tasks = new java.util.ArrayList<>();
+    
+        int numVectors = leftMatrix.length();
+
+        for (int i = 0; i < numVectors; i++) {
+            final int index = i; 
+            
+            tasks.add(() -> {
+                leftMatrix.get(index).transpose();
+            });
+        }
+    
+        return tasks;
     }
 
     public String getWorkerReport() {
-        // TODO: return summary of worker activity
-        return null;
+        return executor.getWorkerReport();
     }
+
+
 }

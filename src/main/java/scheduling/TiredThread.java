@@ -56,7 +56,14 @@ public class TiredThread extends Thread implements Comparable<TiredThread> {
      * it throws IllegalStateException.
      */
     public void newTask(Runnable task) {
-       // TODO
+        if(!alive.get()) 
+            throw new IllegalStateException("Worker is dead and cannot accept tasks");
+        try{
+            handoff.add(task);  
+        }
+        catch(Exception e){
+            throw new IllegalStateException("Worker is busy (queue is full)");
+        }
     }
 
     /**
@@ -64,17 +71,42 @@ public class TiredThread extends Thread implements Comparable<TiredThread> {
      * Inserts a poison pill so the worker wakes up and exits.
      */
     public void shutdown() {
-       // TODO
+        newTask(POISON_PILL);
     }
 
     @Override
     public void run() {
-       // TODO
+        while(alive.get()){
+            try{
+                Runnable curr = handoff.take();
+                if(curr == POISON_PILL) {
+                    alive.set(false);
+                    break;
+                }
+                long now = System.nanoTime();
+                long idleDur = now - idleStartTime.get();
+                timeIdle.addAndGet(idleDur);
+                busy.set(true);
+                long startWork = System.nanoTime();
+                try{
+                    curr.run();
+                }
+                catch(Exception e){
+                }
+
+                long workDur = System.nanoTime() - startWork;
+                timeUsed.addAndGet(workDur);
+                busy.set(false);
+                idleStartTime.set(System.nanoTime());
+            }
+            catch(Exception e){
+                break;
+            }
+        }
     }
 
     @Override
     public int compareTo(TiredThread o) {
-        // TODO
-        return 0;
+        return Double.compare(this.getFatigue(), o.getFatigue());
     }
 }
