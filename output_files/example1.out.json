@@ -1,3 +1,3 @@
 {
-  "error" : "Parse error: Failed to read the input JSON file: input_files\\example1.json (The system cannot find the path specified)"
+  "error" : "Parse error: Failed to read the input JSON file: .\\input_files\\example1.json (The system cannot find the path specified)"
 }
