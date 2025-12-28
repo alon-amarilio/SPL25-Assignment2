@@ -26,7 +26,8 @@ public class TiredExecutor {
         try{
             TiredThread tired = idleMinHeap.take();
             inFlight.incrementAndGet();
-            tired.newTask(() -> {
+            try{
+                tired.newTask(() -> {
                 try{
                     task.run();
                 }
@@ -35,7 +36,13 @@ public class TiredExecutor {
                     idleMinHeap.add(tired);
                     synchronized(this) { this.notifyAll(); }
                 }
-            });
+                });
+            }
+            catch (Exception e) {
+                inFlight.decrementAndGet();
+                idleMinHeap.add(tired);
+                throw e;
+            }    
         }
         catch(Exception e){
             Thread.currentThread().interrupt();
